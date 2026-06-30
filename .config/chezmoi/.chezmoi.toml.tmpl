@@ -1,0 +1,4 @@
+# .config/chezmoi/.chezmoi.toml.tmpl
+# DEV_ROOT is injected so templates can point env vars at this repo.
+[data]
+    devRoot = {{ env "DEV_ROOT" | quote }}
