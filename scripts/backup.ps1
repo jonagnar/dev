@@ -17,6 +17,16 @@ function Get-DevRepos {
     return $repos
 }
 
+function Get-BackupRecipients {
+    param([string]$Root)
+    $sops = Join-Path $Root '.config/sops/.sops.yaml'
+    if (-not (Test-Path $sops)) { throw "No .config/sops/.sops.yaml found — run init first." }
+    $line = Get-Content $sops | Where-Object { $_ -match '^\s*age:' } | Select-Object -First 1
+    if (-not $line) { throw ".sops.yaml has no 'age:' recipient." }
+    $val = ($line -replace '^\s*age:\s*', '').Trim().Trim('"', "'")
+    return ($val -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
 function Invoke-Backup {
     param([switch]$WhatIf, [switch]$Yes, [string]$BackupDir)
     $script:DryRun = [bool]$WhatIf
@@ -43,8 +53,11 @@ function Invoke-Backup {
         Invoke-Native -File 'tar' -Arguments @('-cf', $tar, '-C', $staging, '.')
     }
     Invoke-Step -Name "age-encrypt + clean up" -Action {
-        $pub = "$( Invoke-Native -File 'age-keygen' -Arguments @('-y', $keyPath) )".Trim()
-        Invoke-Native -File 'age' -Arguments @('-r', $pub, '-o', $enc, $tar)
+        $recipients = Get-BackupRecipients -Root $root
+        $ageArgs = @()
+        foreach ($r in $recipients) { $ageArgs += @('-r', $r) }
+        $ageArgs += @('-o', $enc, $tar)
+        Invoke-Native -File 'age' -Arguments $ageArgs
         Remove-Item $tar -Force -ErrorAction SilentlyContinue
         Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
     }

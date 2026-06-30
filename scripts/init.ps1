@@ -10,18 +10,20 @@ param([switch]$WhatIf, [switch]$Yes, [switch]$Help)
 . "$PSScriptRoot/verify.ps1"   # provides Invoke-Verify for Phase 6
 
 function New-DevAgeKey {
-    param([string]$KeyPath, [string]$SopsConfig)
+    param([string]$KeyPath, [string]$SopsTemplate, [string]$SopsConfig)
     $dir = Split-Path -Parent $KeyPath
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    # Lock the key directory to the current user BEFORE writing the key (no inheritable window).
+    if ($IsWindows) {
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        Invoke-Native -File 'icacls' -Arguments @($dir, '/inheritance:r', '/grant:r', "${me}:(OI)(CI)F")
+    }
     if (-not (Test-Path $KeyPath)) {
         Invoke-Native -File 'age-keygen' -Arguments @('-o', $KeyPath)
-        # lock down to current user, read-only
-        if ($IsWindows -or $null -eq $IsWindows) {
-            Invoke-Native -File 'icacls' -Arguments @($KeyPath, '/inheritance:r', '/grant:r', "$($env:USERNAME):(R)")
-        }
     }
+    # Render the gitignored .sops.yaml from the tracked template with this machine's PUBLIC key.
     $pub = "$( Invoke-Native -File 'age-keygen' -Arguments @('-y', $KeyPath) )".Trim()
-    (Get-Content $SopsConfig -Raw) -replace 'REPLACE_WITH_AGE_PUBLIC_KEY', $pub |
+    (Get-Content $SopsTemplate -Raw) -replace 'REPLACE_WITH_AGE_PUBLIC_KEY', $pub |
         Set-Content $SopsConfig -NoNewline
 }
 
@@ -75,9 +77,11 @@ function Invoke-Init {
 
     Write-Phase "Phase 4 — Secrets"
     Invoke-Step -Name "generate work age key + write recipient" -Action {
-        New-DevAgeKey -KeyPath (Get-AgeKeyPath) -SopsConfig (Join-Path $root '.config/sops/.sops.yaml')
+        New-DevAgeKey -KeyPath (Get-AgeKeyPath) `
+            -SopsTemplate (Join-Path $root '.config/sops/.sops.yaml.tmpl') `
+            -SopsConfig (Join-Path $root '.config/sops/.sops.yaml')
     }
-    Write-Info "Store the PRIVATE key (~/.config/sops/age/keys.txt) in Vaultwarden + offline."
+    Write-Info "Store the PRIVATE key (~/.config/sops/age/keys.txt) in your password manager (Bitwarden/Vaultwarden) + offline."
 
     Write-Phase "Phase 5 — Schedule"
     Invoke-Step -Name "register daily catch-up backup task" -Action {

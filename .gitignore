@@ -8,6 +8,9 @@ keys.txt
 !*.env.sops
 !*.env.example
 
+# rendered sops config (machine-specific public recipient; init renders it from .sops.yaml.tmpl)
+.config/sops/.sops.yaml
+
 # gitignored holding folders (keep the folder, drop the contents)
 ops/*
 !ops/.gitkeep

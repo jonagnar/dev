@@ -19,20 +19,22 @@ function Invoke-Verify {
         Add-Check -Name "folder: $d" -Ok (Test-Path (Join-Path $root $d)) -Detail "missing"
     }
 
-    # sops round-trip (only if the key exists)
-    $sopsOk = $false
+    # age key round-trip: encrypt a probe to the public key, decrypt with the private key, compare.
+    $roundtripOk = $false
     if (Test-Path $keyPath) {
         try {
+            $probe = 'devenv-roundtrip-probe'
             $tmp = New-TemporaryFile
-            "probe: ok`n" | Set-Content $tmp
-            $env:SOPS_AGE_KEY_FILE = $keyPath
-            $pubKey = "$( Invoke-Native -File 'age-keygen' -Arguments @('-y', $keyPath) )".Trim()
-            Invoke-Native -File 'sops' -Arguments @('--encrypt', '--age', $pubKey, $tmp) | Out-Null
-            $sopsOk = $true
-            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
-        } catch { $sopsOk = $false }
+            Set-Content -Path $tmp -Value $probe -NoNewline
+            $enc = "$tmp.age"
+            $recipient = "$( Invoke-Native -File 'age-keygen' -Arguments @('-y', $keyPath) )".Trim()
+            Invoke-Native -File 'age' -Arguments @('-r', $recipient, '-o', $enc, $tmp) | Out-Null
+            $decrypted = "$( Invoke-Native -File 'age' -Arguments @('-d', '-i', $keyPath, $enc) )".Trim()
+            $roundtripOk = ($decrypted -eq $probe)
+            Remove-Item $tmp, $enc -Force -ErrorAction SilentlyContinue
+        } catch { $roundtripOk = $false }
     }
-    Add-Check -Name "sops round-trip" -Ok $sopsOk -Detail "encrypt failed"
+    Add-Check -Name "age key round-trip" -Ok $roundtripOk -Detail "encrypt/decrypt failed — key may be wrong"
 
     $taskOk = [bool](Get-ScheduledTask -TaskName 'devenv-backup' -ErrorAction SilentlyContinue)
     Add-Check -Name "backup task registered" -Ok $taskOk -Detail "devenv-backup not found — run init"
