@@ -13,7 +13,8 @@ function Invoke-Update {
 
     Write-Phase "Update"
     Invoke-Step -Name "git pull meta-repo" -Action {
-        Invoke-Native -File 'git' -Arguments @('-C', $root, 'pull', '--ff-only')
+        try { Invoke-Native -File 'git' -Arguments @('-C', $root, 'pull', '--ff-only') }
+        catch { Write-Warn "git pull failed (continuing): $($_.Exception.Message)" }
     }
 
     if (Confirm-Action -Message "Update installed tools (scoop + mise)?") {

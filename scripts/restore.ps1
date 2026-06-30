@@ -7,7 +7,7 @@ param([switch]$WhatIf, [switch]$Yes, [string]$Archive, [string]$BackupDir, [swit
 function Get-LatestArchive {
     param([string]$BackupDir)
     Get-ChildItem (Join-Path $BackupDir 'dev-backup-*.tar.age') -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 }
 
 function Invoke-Restore {

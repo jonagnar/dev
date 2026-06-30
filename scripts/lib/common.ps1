@@ -48,7 +48,7 @@ function Confirm-Action {
 }
 
 function Test-Admin {
-    if ($IsWindows -or $null -eq $IsWindows) {
+    if ($IsWindows) {
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
         $principal = New-Object Security.Principal.WindowsPrincipal($id)
         return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)

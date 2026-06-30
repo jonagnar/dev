@@ -12,7 +12,7 @@ invoke_update() {
     local root; root="$(dev_root)"
 
     phase "Update"
-    step "git pull meta-repo" run_native git -C "$root" pull --ff-only || return 1
+    step "git pull meta-repo" run_native git -C "$root" pull --ff-only || warn "git pull failed (continuing)"
 
     if confirm "Update installed tools (mise)?"; then
         step "reconcile mise tools" _update_mise "$root" || return 1

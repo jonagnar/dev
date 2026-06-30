@@ -31,5 +31,23 @@ reset_native_calls
 invoke_update </dev/null >/dev/null 2>&1
 assert_eq "0" "$(native_calls_matching 'mise')" "declined confirm -> no mise calls"
 
+# Case 4: git pull fails -> update still calls chezmoi apply and returns 0
+DRY_RUN=0; ASSUME_YES=1
+reset_native_calls
+# Override run_native to fail only for "git ... pull"
+run_native() {
+    local args="$*"
+    NATIVE_CALLS+=("$args")
+    if [[ "$args" == *"git"* && "$args" == *"pull"* ]]; then
+        return 1
+    fi
+    return 0
+}
+invoke_update >/dev/null 2>&1
+assert_eq "0" "$?" "git pull failure does not abort update (exit 0)"
+assert_true "$(( $(native_calls_matching 'chezmoi apply') > 0 ? 0 : 1 ))" "chezmoi apply called despite git pull failure"
+# restore the standard mock for any subsequent tests
+install_run_native_mock
+
 echo "update_test: $((TESTS_RUN - TESTS_FAILED))/$TESTS_RUN passed"
 exit "$TESTS_FAILED"

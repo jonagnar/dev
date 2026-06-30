@@ -5,15 +5,12 @@
 #   ./scripts/restore.sh --yes [--archive FILE] [--backup-dir DIR]
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
-# Newest dev-backup-*.tar.age in BackupDir, by name (timestamps sort lexically).
+# Newest dev-backup-*.tar.age in BackupDir, by modification time.
 get_latest_archive() {
     local backup_dir="$1"
     local latest=""
-    local f
-    for f in "$backup_dir"/dev-backup-*.tar.age; do
-        [[ -e "$f" ]] || continue
-        [[ -z "$latest" || "$f" > "$latest" ]] && latest="$f"
-    done
+    latest="$(find "$backup_dir" -maxdepth 1 -name 'dev-backup-*.tar.age' -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -n1 | cut -d' ' -f2-)"
     [[ -n "$latest" ]] && printf '%s\n' "$latest"
     return 0
 }

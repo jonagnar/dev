@@ -23,14 +23,14 @@ invoke_restore --backup-dir "$WORK/backups" >/dev/null 2>&1
 assert_true "$(( $(native_calls_matching 'age -d') > 0 ? 0 : 1 ))" "calls age -d (decrypt)"
 assert_true "$(( $(native_calls_matching 'tar -xf') > 0 ? 0 : 1 ))" "calls tar -xf (extract)"
 
-# get_latest_archive: picks newest by name (descending)
+# get_latest_archive: picks newest by mtime (not name)
 unset -f get_latest_archive
 source "$SELF_DIR/../../scripts/restore.sh"
 mkdir -p "$WORK/bk"
-: > "$WORK/bk/dev-backup-20240101-000000.tar.age"
-: > "$WORK/bk/dev-backup-20250601-120000.tar.age"
+touch -d "2024-01-01 00:00:00" "$WORK/bk/dev-backup-20250601-120000.tar.age"
+touch -d "2025-06-01 12:00:00" "$WORK/bk/dev-backup-20240101-000000.tar.age"
 latest="$(get_latest_archive "$WORK/bk")"
-assert_contains "$latest" "20250601-120000" "latest archive is the newest by name"
+assert_contains "$latest" "20240101-000000" "latest archive is the newest by mtime (not name)"
 
 echo "restore_test: $((TESTS_RUN - TESTS_FAILED))/$TESTS_RUN passed"
 exit "$TESTS_FAILED"

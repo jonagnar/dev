@@ -25,4 +25,12 @@ Describe "Invoke-Update" {
         Invoke-Update
         Should -Invoke Invoke-Native -ParameterFilter { $File -eq 'mise' } -Times 0
     }
+    It "continues to chezmoi apply when git pull fails" {
+        Mock Confirm-Action { $true }
+        Mock Invoke-Verify { 0 }
+        Mock Invoke-Native { }
+        Mock Invoke-Native { throw "network down" } -ParameterFilter { $File -eq 'git' -and ($Arguments -contains 'pull') }
+        { Invoke-Update -Yes } | Should -Not -Throw
+        Should -Invoke Invoke-Native -ParameterFilter { $File -eq 'chezmoi' -and ($Arguments -contains 'apply') }
+    }
 }
