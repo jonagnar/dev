@@ -108,8 +108,11 @@ invoke_backup() {
 
     local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
     local staging="${TMPDIR:-/tmp}/devbackup-$stamp"
-    local tar_file="$backup_dir/dev-backup-$stamp.tar"
-    local enc="$tar_file.age"
+    # The plaintext tar stays in TMPDIR — only the .age ciphertext ever touches
+    # the destination, which is often a sync-watched folder that could upload a
+    # transient plaintext file before we shred it.
+    local tar_file="${TMPDIR:-/tmp}/dev-backup-$stamp.tar"
+    local enc="$backup_dir/dev-backup-$stamp.tar.age"
 
     phase "Backup -> $enc"
 
