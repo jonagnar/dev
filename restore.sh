@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# restore.sh — decrypt a backup/*.tar.age archive and extract to staging.
+# restore.sh — decrypt a dev-backup-*.tar.age archive and extract to staging.
 #   ./restore.sh --dry-run
 #   ./restore.sh --yes [--archive FILE] [--backup-dir DIR]
-# Looks in $DEV_BACKUP_DIR if set, else <repo>/backup (same default as backup.sh).
+# Looks where backup.sh writes: --backup-dir > $DEV_BACKUP_DIR >
+# ~/.config/dev/backup-dir (install asks once) > ~/backups.
 
 DRY_RUN=0
 ASSUME_YES=0
@@ -37,6 +38,14 @@ confirm() {
 
 dev_root()     { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
 age_key_path() { printf '%s/.config/sops/age/keys.txt\n' "$HOME"; }
+
+# Destination preference: $DEV_BACKUP_DIR > ~/.config/dev/backup-dir > ~/backups.
+backup_dest() {
+    if [[ -n "${DEV_BACKUP_DIR:-}" ]]; then printf '%s\n' "$DEV_BACKUP_DIR"; return 0; fi
+    local pref="$HOME/.config/dev/backup-dir"
+    if [[ -f "$pref" ]]; then head -n1 "$pref"; return 0; fi
+    printf '%s/backups\n' "$HOME"
+}
 
 # age comes from mise; outside an interactive shell (cron, plain bash -c)
 # mise isn't activated and its shims can't pick a version without the repo's
@@ -82,7 +91,7 @@ invoke_restore() {
 
     local root; root="$(dev_root)"
     ensure_age "$root"
-    [[ -n "$backup_dir" ]] || backup_dir="${DEV_BACKUP_DIR:-$root/backup}"
+    [[ -n "$backup_dir" ]] || backup_dir="$(backup_dest)"
     [[ -n "$archive" ]] || archive="$(get_latest_archive "$backup_dir")"
     if [[ -z "$archive" ]]; then
         err "No backups found in $backup_dir. Nothing to restore."
@@ -108,7 +117,10 @@ invoke_restore() {
 _restore_extract() {
     local staging="$1" tar_file="$2"
     mkdir -p "$staging"
-    run_native tar -xf "$tar_file" -C "$staging" || return 1
+    if ! run_native tar -xf "$tar_file" -C "$staging"; then
+        rmdir "$staging" 2>/dev/null || true   # don't litter empty staging dirs on failure
+        return 1
+    fi
     rm -f "$tar_file" 2>/dev/null || true
 }
 

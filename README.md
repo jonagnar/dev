@@ -72,17 +72,18 @@ Off-boarding = remove the key + `updatekeys` again.
 ## Backups
 `backup` writes `dev-backup-<timestamp>.tar.age` — git bundles of the meta-repo +
 each `ops/<repo>` (including `ops/infra`), age-encrypted to your public key.
-Destination: `$DEV_BACKUP_DIR` if set, else `backup/`; `restore` looks in the
-same place.
 
-**Off-site**: sync apps (Proton Drive, OneDrive, …) can only watch *local*
+Destination (first match wins) — `restore` looks in the same place:
+1. `--backup-dir DIR` (per run)
+2. `$DEV_BACKUP_DIR` (env)
+3. `~/.config/dev/backup-dir` — **install asks once** and saves your answer
+4. `~/backups`
+
+**Off-site tip**: sync apps (Proton Drive, OneDrive, …) can only watch *local*
 folders — a WSL path is a network drive to Windows and can't be synced. So flip
-the direction: write snapshots straight *into* the app's synced folder. The
-archive is ciphertext, so the provider only ever sees ciphertext:
-```sh
-# in ~/.bashrc (or per-run with --backup-dir)
-export DEV_BACKUP_DIR="/mnt/c/Proton Drive/My files/backups/dev-snapshots"
-```
+the direction: answer install's question with a folder *inside* the app's synced
+tree (e.g. `/mnt/c/Proton Drive/My files/backups/dev-snapshots`). The archive is
+ciphertext, so the provider only ever sees ciphertext.
 
 > Live service state (the Forgejo DB, container volumes) is **not** in these bundles.
 > It's dumped separately by `ops/infra` (see `ops/infra/RESTORE.md`). Rule of thumb:

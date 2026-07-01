@@ -9,9 +9,10 @@ This is a self-contained dev-environment meta-repo. One clone = the whole contex
   `ops/resources` (shared SDD assets + render tools), and `ops/infra` — homelab
   infra-as-code (`WAAAGH/infra`): compose stacks + `*.env.sops` secrets; live Docker
   volumes/data untracked per its own `.gitignore`.
-- `backup/` — age-encrypted snapshots (gitignored).
 - `.config/` — machinery: `mise/core.toml` (core tools), `sops/.sops.yaml`
-  (age recipient), `chezmoi/` (shell-init templates).
+  (age recipient), `chezmoi/` (shell-init templates). Backups land OUTSIDE the
+  repo: `--backup-dir` > `$DEV_BACKUP_DIR` > `~/.config/dev/backup-dir` >
+  `~/backups`.
 
 ## Rules
 - Secrets live in `*.env.sops` (ciphertext) per project; never commit plaintext.

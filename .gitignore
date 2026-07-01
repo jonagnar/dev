@@ -14,8 +14,6 @@ keys.txt
 # gitignored holding folders (keep the folder, drop the contents)
 ops/*
 !ops/.gitkeep
-backup/*
-!backup/.gitkeep
 # restore.sh staging dirs
 restore-*/
 

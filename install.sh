@@ -106,6 +106,28 @@ _chezmoi_apply() {
     DEV_ROOT="$root" run_native chezmoi init --apply "${extra[@]}" --source "$root/.config/chezmoi"
 }
 
+# Ask once where backups should go; persist to ~/.config/dev/backup-dir.
+# backup.sh/restore.sh read it (overridable via $DEV_BACKUP_DIR / --backup-dir).
+# Non-interactive (--yes / no tty): defaults to ~/backups without asking.
+_backup_pref() {
+    local pref="$HOME/.config/dev/backup-dir"
+    if [[ -f "$pref" ]]; then
+        info "backup destination: $(head -n1 "$pref") (already set — edit $pref to change)"
+        return 0
+    fi
+    local default="$HOME/backups" answer=""
+    if [[ "$ASSUME_YES" == "1" || ! -t 0 ]]; then
+        answer="$default"
+    else
+        read -r -p "Where should backups go? (tip: a folder your sync app watches) [$default] " answer
+        [[ -n "$answer" ]] || answer="$default"
+        answer="${answer/#\~/$HOME}"
+    fi
+    ensure_dir "$(dirname "$pref")"
+    printf '%s\n' "$answer" > "$pref"
+    info "backup destination: $answer (saved to $pref)"
+}
+
 # Hook ~/.config/dev/shell-init.sh into ~/.bashrc with ONE appended line.
 # Never rewrites .bashrc — append-if-missing only, so user config is untouched.
 _hook_bashrc() {
@@ -145,10 +167,7 @@ invoke_install() {
     fi
 
     phase "Phase 2 — Skeleton"
-    local d
-    for d in ops backup; do
-        step "ensure $d/" ensure_dir "$root/$d" || return 1
-    done
+    step "ensure ops/" ensure_dir "$root/ops" || return 1
 
     phase "Phase 3 — Host config"
     step "chezmoi init --apply" _chezmoi_apply "$root" || return 1
@@ -160,6 +179,9 @@ invoke_install() {
         "$root/.config/sops/.sops.yaml.tmpl" \
         "$root/.config/sops/.sops.yaml" || return 1
     info "Store the PRIVATE key (~/.config/sops/age/keys.txt) in your password manager (Bitwarden/Vaultwarden) + offline."
+
+    phase "Phase 5 — Backup destination"
+    step "record backup destination (asked once)" _backup_pref || return 1
 
     info ""
     info "Done — provisioning complete. Run ./backup.sh whenever you want a snapshot."

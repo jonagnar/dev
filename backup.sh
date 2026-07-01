@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# backup.sh — produce an age-encrypted snapshot of all repos into backup/.
+# backup.sh — produce an age-encrypted snapshot of all repos.
 # Never prompts (nothing destructive) — run it whenever you want a snapshot.
 #   ./backup.sh --dry-run
 #   ./backup.sh [--backup-dir DIR]
-# Default dir: $DEV_BACKUP_DIR if set, else <repo>/backup. Point it INTO your
+# Destination (first match wins): --backup-dir > $DEV_BACKUP_DIR >
+# ~/.config/dev/backup-dir (install asks once) > ~/backups. Point it INTO your
 # sync app's local folder (e.g. Proton Drive on /mnt/c) — the archive is
 # ciphertext, so the synced copy is safe; sync apps can't watch WSL paths.
 
@@ -29,6 +30,14 @@ step() {
 }
 
 dev_root() { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
+
+# Destination preference: $DEV_BACKUP_DIR > ~/.config/dev/backup-dir > ~/backups.
+backup_dest() {
+    if [[ -n "${DEV_BACKUP_DIR:-}" ]]; then printf '%s\n' "$DEV_BACKUP_DIR"; return 0; fi
+    local pref="$HOME/.config/dev/backup-dir"
+    if [[ -f "$pref" ]]; then head -n1 "$pref"; return 0; fi
+    printf '%s/backups\n' "$HOME"
+}
 
 # age comes from mise; outside an interactive shell (cron, plain bash -c)
 # mise isn't activated and its shims can't pick a version without the repo's
@@ -94,7 +103,7 @@ invoke_backup() {
 
     local root; root="$(dev_root)"
     ensure_age "$root"
-    [[ -n "$backup_dir" ]] || backup_dir="${DEV_BACKUP_DIR:-$root/backup}"
+    [[ -n "$backup_dir" ]] || backup_dir="$(backup_dest)"
 
     local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
     local staging="${TMPDIR:-/tmp}/devbackup-$stamp"
