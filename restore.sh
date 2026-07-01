@@ -38,12 +38,11 @@ dev_root()     { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
 age_key_path() { printf '%s/.config/sops/age/keys.txt\n' "$HOME"; }
 
 parse_common_flags() {
-    REST_ARGS=(); SHOW_HELP=0
+    REST_ARGS=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run|--what-if) DRY_RUN=1 ;;
             --yes|-y)            ASSUME_YES=1 ;;
-            --help|-h)           SHOW_HELP=1 ;;
             *)                   REST_ARGS+=("$1") ;;
         esac
         shift

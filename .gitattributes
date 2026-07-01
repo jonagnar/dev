@@ -12,11 +12,6 @@
 # Unix shell scripts and their templates must always be LF.
 *.sh   text eol=lf
 
-# Windows-native PowerShell keeps CRLF in the working tree.
-*.ps1  text eol=crlf
-*.psm1 text eol=crlf
-*.psd1 text eol=crlf
-
 # Never munge binaries.
 *.age    binary
 *.bundle binary

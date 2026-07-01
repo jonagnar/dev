@@ -16,6 +16,8 @@ ops/*
 !ops/.gitkeep
 backup/*
 !backup/.gitkeep
+# restore.sh staging dirs
+restore-*/
 
 # OS / editor noise
 .DS_Store

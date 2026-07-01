@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # backup.sh — produce an age-encrypted snapshot of all repos into backup/.
+# Never prompts (nothing destructive) — run it whenever you want a snapshot.
 #   ./backup.sh --dry-run
-#   ./backup.sh --yes [--backup-dir DIR]
+#   ./backup.sh [--backup-dir DIR]
 
 DRY_RUN=0
-ASSUME_YES=0
 
 info()  { printf '%s\n' "$*"; }
 warn()  { printf 'WARN: %s\n' "$*" >&2; }
@@ -28,12 +28,11 @@ step() {
 dev_root() { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
 
 parse_common_flags() {
-    REST_ARGS=(); SHOW_HELP=0
+    REST_ARGS=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run|--what-if) DRY_RUN=1 ;;
-            --yes|-y)            ASSUME_YES=1 ;;
-            --help|-h)           SHOW_HELP=1 ;;
+            --yes|-y)            ;;  # accepted for symmetry; backup never prompts
             *)                   REST_ARGS+=("$1") ;;
         esac
         shift

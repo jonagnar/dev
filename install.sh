@@ -37,12 +37,11 @@ dev_root()     { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
 age_key_path() { printf '%s/.config/sops/age/keys.txt\n' "$HOME"; }
 
 parse_common_flags() {
-    REST_ARGS=(); SHOW_HELP=0
+    REST_ARGS=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run|--what-if) DRY_RUN=1 ;;
             --yes|-y)            ASSUME_YES=1 ;;
-            --help|-h)           SHOW_HELP=1 ;;
             *)                   REST_ARGS+=("$1") ;;
         esac
         shift
@@ -78,10 +77,16 @@ new_dev_age_key() {
             run_native age-keygen -o "$key_path" || exit 1
         fi
         chmod 600 "$key_path" 2>/dev/null || warn "could not chmod 600 $key_path"
-        pub="$(run_native age-keygen -y "$key_path")" || exit 1
-        pub="${pub//[$'\r\n']/}"
-        ensure_dir "$(dirname "$sops_config")"
-        sed "s|REPLACE_WITH_AGE_PUBLIC_KEY|$pub|" "$sops_tmpl" > "$sops_config"
+        # Render the recipient file only on first run — it may have gained
+        # extra recipients since, and re-rendering would silently drop them.
+        if [[ ! -f "$sops_config" ]]; then
+            pub="$(run_native age-keygen -y "$key_path")" || exit 1
+            pub="${pub//[$'\r\n']/}"
+            ensure_dir "$(dirname "$sops_config")"
+            sed "s|REPLACE_WITH_AGE_PUBLIC_KEY|$pub|" "$sops_tmpl" > "$sops_config"
+        else
+            info ".sops.yaml already rendered — keeping it (recipients preserved)."
+        fi
     ) || return 1
 }
 
@@ -94,7 +99,11 @@ _mise_install() {
 
 _chezmoi_apply() {
     local root="$1"
-    DEV_ROOT="$root" run_native chezmoi init --apply --source "$root/.config/chezmoi"
+    # --yes makes this truly non-interactive: chezmoi otherwise prompts when a
+    # managed target changed on disk since it last wrote it.
+    local -a extra=()
+    [[ "$ASSUME_YES" == "1" ]] && extra=(--force)
+    DEV_ROOT="$root" run_native chezmoi init --apply "${extra[@]}" --source "$root/.config/chezmoi"
 }
 
 # Hook ~/.config/dev/shell-init.sh into ~/.bashrc with ONE appended line.

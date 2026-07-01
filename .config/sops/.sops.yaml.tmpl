@@ -1,6 +1,8 @@
-# .config/sops/.sops.yaml — age recipient(s) allowed to decrypt this repo's
-# secrets. `init` writes this machine's PUBLIC key into `age:` below.
-# Add teammate / CI public keys here (comma-separated) for multi-recipient.
+# .config/sops/.sops.yaml — this machine's seed recipient file. `install`
+# renders it ONCE (with this machine's PUBLIC key) and never overwrites it.
+# Per-project secrets: copy the rendered file into the project repo as its
+# .sops.yaml (public keys only — safe to commit); teammates/CI append their
+# public keys there, comma-separated.
 creation_rules:
   - path_regex: \.env\.sops$
     age: "REPLACE_WITH_AGE_PUBLIC_KEY"
