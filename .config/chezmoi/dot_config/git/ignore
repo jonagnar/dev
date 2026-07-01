@@ -11,4 +11,3 @@ id_rsa
 id_ed25519
 *.p12
 *.pfx
-.direnv/
