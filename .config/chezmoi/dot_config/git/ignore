@@ -1,0 +1,14 @@
+# Global git ignore (core.excludesFile) — plaintext secrets never get staged in ANY repo.
+# Encrypted *.sops files and .env.example ARE allowed (safe to commit).
+.env
+.env.*
+!.env.example
+!*.sops
+!*.sops.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.p12
+*.pfx
+.direnv/

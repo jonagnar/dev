@@ -1,0 +1,20 @@
+# Managed by chezmoi — edit this template, not ~/.gitconfig.
+[user]
+    name = {{ .gitName }}
+    email = {{ .gitEmail }}
+[init]
+    defaultBranch = main
+    templateDir = ~/.config/git/template
+[pull]
+    ff = only
+[core]
+    excludesFile = ~/.config/git/ignore
+[alias]
+    st = status -sb
+    co = checkout
+    sw = switch
+    br = branch
+    ci = commit
+    lg = log --oneline --graph --decorate -20
+    last = log -1 HEAD --stat
+    unstage = reset HEAD --

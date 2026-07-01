@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Managed by chezmoi (dev-env). Block commits that contain secrets.
+# No-op when gitleaks isn't installed; scans only staged changes.
+command -v gitleaks >/dev/null 2>&1 || exit 0
+exec gitleaks protect --staged --no-banner --redact

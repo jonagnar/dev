@@ -7,3 +7,4 @@ sops     = "latest"
 age      = "latest"
 chezmoi  = "latest"
 gitleaks = "latest"
+direnv   = "latest"   # per-directory env; powers `cd`-into-repo secret auto-load

@@ -10,3 +10,6 @@ $env:PATH = (Join-Path $env:DEV_ROOT "tools/bin") + [IO.Path]::PathSeparator + $
 if (Get-Command mise -ErrorAction SilentlyContinue) {
     mise activate pwsh | Out-String | Invoke-Expression
 }
+if (Get-Command direnv -ErrorAction SilentlyContinue) {
+    direnv hook pwsh | Out-String | Invoke-Expression
+}
