@@ -5,8 +5,8 @@ This is a self-contained dev-environment meta-repo. One clone = the whole contex
 ## Layout
 - Root scripts — the tool: `install.sh` (provision), `backup.sh` (age-encrypted
   snapshot), `restore.sh` (decrypt + extract). Standalone bash, no shared lib.
-- `ops/` — your cloned repos (gitignored): projects plus `ops/notes` (Obsidian vault),
-  `ops/resources` (shared SDD assets + render tools), and `ops/infra` — homelab
+- `src/` — your cloned repos (gitignored): projects plus `src/notes` (Obsidian vault),
+  `src/resources` (shared SDD assets + render tools), and `src/infra` — homelab
   infra-as-code (`WAAAGH/infra`): compose stacks + `*.env.sops` secrets; live Docker
   volumes/data untracked per its own `.gitignore`.
 - `.config/` — machinery: `mise/core.toml` (core tools), `sops/.sops.yaml`

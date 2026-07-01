@@ -12,8 +12,8 @@ keys.txt
 .config/sops/.sops.yaml
 
 # gitignored holding folders (keep the folder, drop the contents)
-ops/*
-!ops/.gitkeep
+src/*
+!src/.gitkeep
 # restore.sh staging dirs
 restore-*/
 

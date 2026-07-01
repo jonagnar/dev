@@ -60,13 +60,13 @@ parse_common_flags() {
     done
 }
 
-# Discover git repos to back up: the meta-repo root plus any git repo directly under ops/.
+# Discover git repos to back up: the meta-repo root plus any git repo directly under src/.
 get_dev_repos() {
     local root="$1"
     [[ -d "$root/.git" ]] && printf '%s\n' "$root"
-    if [[ -d "$root/ops" ]]; then
+    if [[ -d "$root/src" ]]; then
         local d
-        for d in "$root/ops"/*/; do
+        for d in "$root/src"/*/; do
             [[ -d "${d%/}/.git" ]] && printf '%s\n' "${d%/}"
         done
     fi

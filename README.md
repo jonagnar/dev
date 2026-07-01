@@ -28,7 +28,7 @@ pre-commit hook guards whatever slips past.
 
 **Per project, once** — recipient file + mise wiring:
 ```sh
-cd ops/<project>
+cd src/<project>
 cp "$DEV_ROOT/.config/sops/.sops.yaml" .sops.yaml   # public keys only — commit it
 ```
 ```toml
@@ -65,13 +65,13 @@ Off-boarding = remove the key + `updatekeys` again.
   `cp ~/.config/git/template/hooks/pre-commit .git/hooks/`
 - `install` renders your machine's `.sops.yaml` seed **once** and never
   overwrites it — recipients you add are safe.
-- Compose stacks (e.g. `ops/infra`) that need a literal env *file* keep the
+- Compose stacks (e.g. `src/infra`) that need a literal env *file* keep the
   dotenv style: `*.env.sops` in git, decrypted with the sops CLI on the host.
   mise-native is for your interactive/dev shell env.
 
 ## Backups
 `backup` writes `dev-backup-<timestamp>.tar.age` — git bundles of the meta-repo +
-each `ops/<repo>` (including `ops/infra`), age-encrypted to your public key.
+each `src/<repo>` (including `src/infra`), age-encrypted to your public key.
 
 Destination (first match wins) — `restore` looks in the same place:
 1. `--backup-dir DIR` (per run)
@@ -86,7 +86,7 @@ tree (e.g. `/mnt/c/Proton Drive/My files/backups/dev-snapshots`). The archive is
 ciphertext, so the provider only ever sees ciphertext.
 
 > Live service state (the Forgejo DB, container volumes) is **not** in these bundles.
-> It's dumped separately by `ops/infra` (see `ops/infra/RESTORE.md`). Rule of thumb:
+> It's dumped separately by `src/infra` (see `src/infra/RESTORE.md`). Rule of thumb:
 > git bundles cover code + config; the Forgejo dump covers live data.
 
 ## Disaster recovery

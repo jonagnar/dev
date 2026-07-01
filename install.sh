@@ -167,7 +167,7 @@ invoke_install() {
     fi
 
     phase "Phase 2 — Skeleton"
-    step "ensure ops/" ensure_dir "$root/ops" || return 1
+    step "ensure src/" ensure_dir "$root/src" || return 1
 
     phase "Phase 3 — Host config"
     step "chezmoi init --apply" _chezmoi_apply "$root" || return 1
