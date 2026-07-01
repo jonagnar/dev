@@ -1,10 +1,56 @@
 #!/usr/bin/env bash
-# scripts/restore.sh — decrypt a backups/*.tar.age archive and extract to staging.
-#   ./scripts/restore.sh --dry-run
-#   ./scripts/restore.sh --yes [--archive FILE] [--backup-dir DIR]
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+# restore.sh — decrypt a backup/*.tar.age archive and extract to staging.
+#   ./restore.sh --dry-run
+#   ./restore.sh --yes [--archive FILE] [--backup-dir DIR]
 
-# Newest dev-backup-*.tar.age in BackupDir, by modification time.
+DRY_RUN=0
+ASSUME_YES=0
+
+info()  { printf '%s\n' "$*"; }
+warn()  { printf 'WARN: %s\n' "$*" >&2; }
+err()   { printf 'ERROR: %s\n' "$*" >&2; }
+phase() { printf '\n== %s ==\n' "$*"; }
+
+# Run "$@"; on non-zero exit print an error and return that status.
+run_native() {
+    "$@"; local rc=$?
+    [[ $rc -ne 0 ]] && err "Command failed (exit $rc): $*"
+    return $rc
+}
+
+# Dry-run-aware step: under --dry-run print the would-message and skip.
+step() {
+    local name="$1"; shift
+    if [[ "$DRY_RUN" == "1" ]]; then printf '  [dry-run] would: %s\n' "$name"; return 0; fi
+    printf '  -> %s\n' "$name"; "$@"
+}
+
+# Return 0 (yes) if --yes; under --dry-run print the would-prompt and return 1.
+confirm() {
+    local message="$1"
+    [[ "$ASSUME_YES" == "1" ]] && return 0
+    if [[ "$DRY_RUN" == "1" ]]; then printf '  [dry-run] would prompt: %s\n' "$message"; return 1; fi
+    local answer; read -r -p "$message [y/N] " answer
+    [[ "$answer" =~ ^([yY]|[yY][eE][sS])$ ]]
+}
+
+dev_root()     { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
+age_key_path() { printf '%s/.config/sops/age/keys.txt\n' "$HOME"; }
+
+parse_common_flags() {
+    REST_ARGS=(); SHOW_HELP=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run|--what-if) DRY_RUN=1 ;;
+            --yes|-y)            ASSUME_YES=1 ;;
+            --help|-h)           SHOW_HELP=1 ;;
+            *)                   REST_ARGS+=("$1") ;;
+        esac
+        shift
+    done
+}
+
+# Newest dev-backup-*.tar.age in backup_dir, by modification time.
 get_latest_archive() {
     local backup_dir="$1"
     local latest=""
@@ -26,7 +72,7 @@ invoke_restore() {
     done
 
     local root; root="$(dev_root)"
-    [[ -n "$backup_dir" ]] || backup_dir="$root/backups"
+    [[ -n "$backup_dir" ]] || backup_dir="$root/backup"
     [[ -n "$archive" ]] || archive="$(get_latest_archive "$backup_dir")"
     if [[ -z "$archive" ]]; then
         err "No backups found in $backup_dir. Nothing to restore."

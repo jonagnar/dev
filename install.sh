@@ -1,18 +1,54 @@
 #!/usr/bin/env bash
-# scripts/init.sh — provision or refresh this machine for the dev-environment.
-#   ./scripts/init.sh --dry-run    # preview
-#   ./scripts/init.sh --yes        # provision non-interactively
+# install.sh — provision or refresh this machine for the dev-environment.
+#   ./install.sh --dry-run    # preview
+#   ./install.sh --yes        # provision non-interactively
 #
 # Notes:
 #   * No root required. Preflight only warns (git missing / no network); under
 #     --dry-run warnings never abort.
 #   * mise is bootstrapped via `curl https://mise.run | sh` (user-scope
 #     ~/.local/bin); git is only warned about (no auto-sudo).
-#   * Scheduling uses a systemd --user timer (graceful skip if absent).
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/verify.sh"   # provides invoke_verify
+#   * Backups are manual — run ./backup.sh when you want a snapshot. If you
+#     want them automatic, schedule it yourself (cron/systemd/whatever).
 
-# ---- overridable seams (tests stub these) ----
+DRY_RUN=0
+ASSUME_YES=0
+
+info()  { printf '%s\n' "$*"; }
+warn()  { printf 'WARN: %s\n' "$*" >&2; }
+err()   { printf 'ERROR: %s\n' "$*" >&2; }
+phase() { printf '\n== %s ==\n' "$*"; }
+
+# Run "$@"; on non-zero exit print an error and return that status.
+run_native() {
+    "$@"; local rc=$?
+    [[ $rc -ne 0 ]] && err "Command failed (exit $rc): $*"
+    return $rc
+}
+
+# Dry-run-aware step: under --dry-run print the would-message and skip.
+step() {
+    local name="$1"; shift
+    if [[ "$DRY_RUN" == "1" ]]; then printf '  [dry-run] would: %s\n' "$name"; return 0; fi
+    printf '  -> %s\n' "$name"; "$@"
+}
+
+dev_root()     { cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; }
+age_key_path() { printf '%s/.config/sops/age/keys.txt\n' "$HOME"; }
+
+parse_common_flags() {
+    REST_ARGS=(); SHOW_HELP=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run|--what-if) DRY_RUN=1 ;;
+            --yes|-y)            ASSUME_YES=1 ;;
+            --help|-h)           SHOW_HELP=1 ;;
+            *)                   REST_ARGS+=("$1") ;;
+        esac
+        shift
+    done
+}
+
 has_cmd()    { command -v "$1" >/dev/null 2>&1; }
 network_ok() {
     # cheap reachability probe; tolerant of missing tools.
@@ -32,10 +68,8 @@ ensure_mise() {
 new_dev_age_key() {
     local key_path="$1" sops_tmpl="$2" sops_config="$3"
     local dir; dir="$(dirname "$key_path")"
-    # umask 077 in a subshell so every dir/file created here is private from
-    # birth (don't rely on age-keygen's default mode or the inherited umask).
-    # NOTE: no `local` inside the subshell — `local` is only valid in a function
-    # body, and a ( ) subshell is not one; `pub` is a plain var here.
+    # umask 077 in a subshell so every dir/file created here is private from birth.
+    # NOTE: no `local` inside the ( ) subshell — it's not a function body; `pub` is plain.
     (
         umask 077
         ensure_dir "$dir"
@@ -51,40 +85,19 @@ new_dev_age_key() {
     ) || return 1
 }
 
-# Register a systemd --user daily backup timer (Persistent for catch-up).
-# Gracefully skips (warn) when systemd --user is unavailable (e.g. WSL w/o systemd).
-register_backup_task() {
+_mise_install() {
     local root="$1"
-    if ! systemctl --user is-system-running >/dev/null 2>&1; then
-        warn "systemd --user not available — skipping backup timer registration."
-        return 0
-    fi
-    local unit_dir="$HOME/.config/systemd/user"
-    ensure_dir "$unit_dir"
-    cat > "$unit_dir/devenv-backup.service" <<EOF
-[Unit]
-Description=dev-environment encrypted backup
-
-[Service]
-Type=oneshot
-ExecStart="${root}/scripts/backup.sh" --yes
-EOF
-    cat > "$unit_dir/devenv-backup.timer" <<'EOF'
-[Unit]
-Description=Daily dev-environment backup (catch-up enabled)
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-    run_native systemctl --user daemon-reload || return 1
-    run_native systemctl --user enable --now devenv-backup.timer || return 1
+    local cfg="$root/.config/mise/core.toml"
+    MISE_GLOBAL_CONFIG_FILE="$cfg" run_native mise trust "$cfg"
+    MISE_GLOBAL_CONFIG_FILE="$cfg" run_native mise install
 }
 
-invoke_init() {
+_chezmoi_apply() {
+    local root="$1"
+    DEV_ROOT="$root" run_native chezmoi init --apply --source "$root/.config/chezmoi"
+}
+
+invoke_install() {
     parse_common_flags "$@"
     local root; root="$(dev_root)"
 
@@ -103,22 +116,21 @@ invoke_init() {
     else
         info "mise already present."
     fi
-    step "mise install core (sops age chezmoi gitleaks)" _init_mise_install "$root" || return 1
+    step "mise install core (sops age chezmoi gitleaks)" _mise_install "$root" || return 1
     # Put the just-installed mise tools on PATH for the rest of THIS process —
-    # chezmoi (Phase 3), age-keygen (Phase 4) and verify (Phase 6) run here,
-    # before any new shell activates mise.
+    # chezmoi (Phase 3) and age-keygen (Phase 4) run before any new shell activates mise.
     if [[ "${DRY_RUN:-0}" -ne 1 ]] && command -v mise >/dev/null 2>&1; then
         eval "$(MISE_GLOBAL_CONFIG_FILE="$root/.config/mise/core.toml" mise env -s bash 2>/dev/null)" || true
     fi
 
     phase "Phase 2 — Skeleton"
     local d
-    for d in ops tools/bin backups; do
+    for d in ops tools/bin backup; do
         step "ensure $d/" ensure_dir "$root/$d" || return 1
     done
 
     phase "Phase 3 — Host config"
-    step "chezmoi init --apply" _init_chezmoi "$root" || return 1
+    step "chezmoi init --apply" _chezmoi_apply "$root" || return 1
 
     phase "Phase 4 — Secrets"
     step "generate work age key + write recipient" \
@@ -127,25 +139,8 @@ invoke_init() {
         "$root/.config/sops/.sops.yaml" || return 1
     info "Store the PRIVATE key (~/.config/sops/age/keys.txt) in your password manager (Bitwarden/Vaultwarden) + offline."
 
-    phase "Phase 5 — Schedule"
-    step "register daily catch-up backup timer" register_backup_task "$root" || return 1
-
-    phase "Phase 6 — Verify"
-    if [[ "$DRY_RUN" != "1" ]]; then
-        invoke_verify >/dev/null || true
-    fi
-}
-
-_init_mise_install() {
-    local root="$1"
-    local cfg="$root/.config/mise/core.toml"
-    MISE_GLOBAL_CONFIG_FILE="$cfg" run_native mise trust "$cfg"
-    MISE_GLOBAL_CONFIG_FILE="$cfg" run_native mise install
-}
-
-_init_chezmoi() {
-    local root="$1"
-    DEV_ROOT="$root" run_native chezmoi init --apply --source "$root/.config/chezmoi"
+    info ""
+    info "Done — provisioning complete. Run ./backup.sh whenever you want a snapshot."
 }
 
 main() {
@@ -153,7 +148,7 @@ main() {
         grep -E '^#( |$)' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
         return 0
     fi
-    invoke_init "$@"
+    invoke_install "$@"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
