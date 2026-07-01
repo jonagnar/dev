@@ -1,0 +1,26 @@
+# Enforce line endings across platforms.
+#
+# Committed blobs are LF. Without this file, a Windows checkout with
+# core.autocrlf=true rewrites every .sh script and bash-consumed template to
+# CRLF, which breaks them under bash/WSL ("$'\r': command not found"). Pinning
+# eol here overrides any machine's autocrlf setting so a clone is correct
+# everywhere.
+
+# Default: detect text vs binary, store LF, check out LF everywhere.
+* text=auto eol=lf
+
+# Unix shell scripts and their templates must always be LF.
+*.sh   text eol=lf
+
+# Windows-native PowerShell keeps CRLF in the working tree.
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Never munge binaries.
+*.age    binary
+*.bundle binary
+*.tar    binary
+*.gz     binary
+*.png    binary
+*.jpg    binary
