@@ -125,7 +125,7 @@ invoke_install() {
 
     phase "Phase 2 — Skeleton"
     local d
-    for d in ops tools/bin backup; do
+    for d in ops backup; do
         step "ensure $d/" ensure_dir "$root/$d" || return 1
     done
 

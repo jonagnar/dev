@@ -9,7 +9,6 @@ This is a self-contained dev-environment meta-repo. One clone = the whole contex
   `ops/resources` (shared SDD assets + render tools), and `ops/infra` — homelab
   infra-as-code (`WAAAGH/infra`): compose stacks + `*.env.sops` secrets; live Docker
   volumes/data untracked per its own `.gitignore`.
-- `tools/` — `bin/` on PATH (gitignored); `manifest.md` documents GUI apps.
 - `backup/` — age-encrypted snapshots (gitignored).
 - `.config/` — machinery: `mise/core.toml` (core tools), `sops/.sops.yaml`
   (age recipient), `chezmoi/` (shell-init templates).
