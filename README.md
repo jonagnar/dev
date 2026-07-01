@@ -4,11 +4,10 @@ A tiny, secret-free meta-repo that provisions a machine, manages sops+age secret
 via mise, and produces encrypted backups. Clone it, run one script.
 
 ## Quick start (Windows)
-1. Install [scoop](https://scoop.sh) (or let `init` do it).
-2. Open PowerShell **as administrator**.
-3. `git clone <repo> dev-env && cd dev-env`
-4. Preview: `./scripts/init.ps1 -WhatIf`  → then `./scripts/init.ps1`
-5. Open a new shell — mise + secrets auto-load.
+1. `git clone <repo> dev-env && cd dev-env`
+2. Preview: `./scripts/init.ps1 -WhatIf`  → then `./scripts/init.ps1`
+   *(No admin needed — `init` bootstraps [scoop](https://scoop.sh) per-user if it's missing. Don't use an elevated shell: scoop refuses to install elevated.)*
+3. Open a new shell — mise + secrets auto-load.
 
 ## Actions
 | Verb | Purpose |

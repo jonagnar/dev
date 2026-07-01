@@ -6,7 +6,8 @@ BeforeAll {
 Describe "Invoke-Init" {
     BeforeEach {
         Mock Invoke-Native { }                       # never touch the system
-        Mock Test-Admin { $true }
+        Mock Test-HasCommand { $true }               # pretend scoop/git present
+        Mock Install-Scoop { }                        # never actually bootstrap scoop
         Mock Get-WslDistro { "Ubuntu" }
         Mock New-DevAgeKey { }                        # secrets phase (defined in init.ps1)
         Mock Register-BackupTask { }
@@ -25,14 +26,19 @@ Describe "Invoke-Init" {
         Should -Invoke Invoke-Native -ParameterFilter { $File -eq 'mise' -and $Arguments -contains 'install' }
     }
 
-    It "aborts with remediation when not admin" {
-        Mock Test-Admin { $false }
-        { Invoke-Init -Yes } | Should -Throw "*administrator*"
+    It "bootstraps scoop when it is missing" {
+        Mock Test-HasCommand { $false } -ParameterFilter { $Name -eq 'scoop' }
+        Invoke-Init -Yes
+        Should -Invoke Install-Scoop -Times 1
     }
 
-    It "previews without throwing under -WhatIf even when not admin" {
-        Mock Test-Admin { $false }
-        { Invoke-Init -WhatIf } | Should -Not -Throw
-        Should -Invoke Invoke-Native -Times 0
+    It "does NOT bootstrap scoop when it is already present" {
+        Mock Test-HasCommand { $true } -ParameterFilter { $Name -eq 'scoop' }
+        Invoke-Init -Yes
+        Should -Invoke Install-Scoop -Times 0
+    }
+
+    It "does not require administrator (scoop refuses to run elevated)" {
+        { Invoke-Init -Yes } | Should -Not -Throw
     }
 }

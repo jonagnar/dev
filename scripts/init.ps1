@@ -9,6 +9,26 @@ param([switch]$WhatIf, [switch]$Yes, [switch]$Help)
 . "$PSScriptRoot/lib/common.ps1"
 . "$PSScriptRoot/verify.ps1"   # provides Invoke-Verify for Phase 6
 
+function Test-HasCommand {
+    param([Parameter(Mandatory)][string]$Name)
+    return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Install-Scoop {
+    # Bootstrap scoop per-user (NO admin), mirroring init.sh's ensure_mise.
+    # Must run non-elevated: scoop refuses to install in an elevated shell.
+    Invoke-Native -File 'pwsh' -Arguments @(
+        '-NoProfile', '-Command',
+        'Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression'
+    )
+    # The installer only edits the persisted user PATH; expose scoop's shims to
+    # the REST of this process so the following `scoop install` resolves.
+    $shims = Join-Path $HOME 'scoop/shims'
+    if (Test-Path $shims) {
+        $env:PATH = $shims + [IO.Path]::PathSeparator + $env:PATH
+    }
+}
+
 function New-DevAgeKey {
     param([string]$KeyPath, [string]$SopsTemplate, [string]$SopsConfig)
     $dir = Split-Path -Parent $KeyPath
@@ -45,14 +65,20 @@ function Invoke-Init {
     $root = Get-DevRoot
 
     Write-Phase "Phase 0 — Preflight"
-    if (-not (Test-Admin)) {
-        $msg = "init must run as administrator. Re-open your terminal with 'Run as administrator' and try again."
-        if ($script:DryRun) { Write-Warn $msg } else { throw $msg }
+    # No admin required (mirrors init.sh's no-root design). scoop is a per-user
+    # package manager that refuses to run in an elevated shell, so requiring
+    # admin would actively block the scoop bootstrap in Phase 1.
+    if (-not (Test-HasCommand 'git')) {
+        Write-Warn "git not found — scoop will install it in Phase 1."
     }
     $distro = Get-WslDistro
     if ($distro) { Write-Info "WSL distro detected: $distro" } else { Write-Warn "No WSL distro found (ok for Windows-only use)." }
 
     Write-Phase "Phase 1 — Tools"
+    Invoke-Step -Name "bootstrap scoop (per-user, if missing)" -Action {
+        if (Test-HasCommand 'scoop') { Write-Info "scoop already present." }
+        else { Install-Scoop }
+    }
     Invoke-Step -Name "scoop install git mise" -Action {
         Invoke-Native -File 'scoop' -Arguments @('install', 'git', 'mise')
     }
