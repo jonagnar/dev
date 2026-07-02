@@ -5,6 +5,31 @@ via mise, and produces encrypted backups. Clone it, run one script. Runs anywher
 bash does: **WSL/Linux**, or **native Windows via Git Bash** (ships with Git —
 mise is bootstrapped through winget there).
 
+## What's a meta-repo? (read this first)
+
+A meta-repo is a repo for *everything around* your projects, not the projects
+themselves. It holds the boring-but-critical layer every machine needs — which
+tools to install, how secrets are encrypted, where backups go — and gives your
+actual repos a common home to live in (`src/`). Clone it on a new machine, run
+one script, and that machine works like all your others.
+
+**What it is:**
+- one repo = your whole dev environment: toolchain, config, secrets wiring, backups
+- a folder convention: your real repos sit *next to each other* under `src/`,
+  each still its own independent clone with its own remote and history
+- disposable glue — delete it and your projects are completely untouched
+
+**What it is NOT:**
+- **not a monorepo** — your projects are never merged into one history, and this
+  repo never contains their code (`src/` is gitignored)
+- not a framework or package manager — nothing gets vendored, wrapped, or imported
+- not a place for secrets — the repo is public-safe by construction; every secret
+  in your projects stays encrypted, and the one decryption key never leaves your
+  machine + password manager
+
+If you've ever inherited a laptop with tools installed by hand, secrets in a
+`config.json`, and no answer to "what if this dies?" — this is the antidote.
+
 ## Quick start
 1. `git clone <repo> dev && cd dev`  *(on Windows: in a Git Bash shell)*
 2. Preview: `./install.sh --dry-run`  → then `./install.sh`
