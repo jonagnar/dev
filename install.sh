@@ -188,6 +188,26 @@ _hook_bashrc() {
     printf '\n# dev meta-repo shell init (installed by install.sh)\n%s\n' "$hook" >> "$rc"
 }
 
+# Login shells (every Git Bash tab, ssh logins) read ~/.bash_profile and SKIP
+# ~/.bashrc unless something chains to it — an nvm-generated .bash_profile,
+# for example, silently orphans the hook above. Append-only, like everything.
+# Never CREATES the file unless nothing else would run (creating it shadows
+# ~/.bash_login / ~/.profile, which may already chain correctly).
+_hook_bash_profile() {
+    local bp="$HOME/.bash_profile"
+    if [[ ! -f "$bp" ]]; then
+        case "$(uname -s)" in
+            MINGW*|MSYS*|CYGWIN*)
+                [[ -f "$HOME/.bash_login" || -f "$HOME/.profile" ]] && return 0 ;;
+            *) return 0 ;;  # Linux defaults chain via ~/.profile — leave alone
+        esac
+    elif grep -q 'bashrc' "$bp"; then
+        info "login-shell chain to ~/.bashrc already present"
+        return 0
+    fi
+    printf '\n# dev meta-repo: login shells (every Git Bash tab) read this file, NOT ~/.bashrc —\n# chain so the shell-init hook actually runs. (installed by install.sh)\n[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n' >> "$bp"
+}
+
 invoke_install() {
     parse_common_flags "$@"
     local root; root="$(dev_root)"
@@ -228,6 +248,7 @@ invoke_install() {
     phase "Phase 3 — Host config"
     step "chezmoi init --apply" _chezmoi_apply "$root" || return 1
     step "hook shell-init into ~/.bashrc (append-only)" _hook_bashrc || return 1
+    step "chain ~/.bash_profile -> ~/.bashrc (login shells, append-only)" _hook_bash_profile || return 1
     step "hook gitconfig include (append-only)" _hook_gitconfig || return 1
     step "check git identity (yours, never ours)" _check_git_identity || return 1
 

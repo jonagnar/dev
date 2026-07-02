@@ -14,6 +14,31 @@ fi
 if ! command -v mise >/dev/null 2>&1 && [ -x "$HOME/.local/bin/mise" ]; then
   export PATH="$HOME/.local/bin:$PATH"
 fi
-if command -v mise >/dev/null 2>&1; then
+if command -v cygpath >/dev/null 2>&1; then
+  # Same self-heal, Windows edition: shells whose env predates the winget
+  # install (VS Code terminals, this session) miss mise.exe — without it the
+  # shims below are dead weight and the prompt hook is silent.
+  if ! command -v mise >/dev/null 2>&1; then
+    for _m in "$(cygpath -u "$LOCALAPPDATA")/Microsoft/WinGet/Links" "$(cygpath -u "$LOCALAPPDATA")"/Microsoft/WinGet/Packages/jdx.mise*/mise/bin; do
+      [ -x "$_m/mise.exe" ] && { export PATH="$_m:$PATH"; break; }
+    done
+    unset _m
+  fi
+  # Windows/Git Bash: `mise activate` is unusable here — its hook-env emits a
+  # Windows-style PATH (C:\...;C:\...) that Git Bash reads as one bogus entry,
+  # clobbering the MSYS PATH (goodbye /usr/bin, sops, everything). Shims put
+  # the tools on PATH; the hand-rolled prompt hook keeps the on-cd env loading
+  # (sops decrypt) by evaling hook-env's output MINUS its poisonous PATH lines.
+  # Trade-off: `_.path` directives in project mise.toml don't apply on Git Bash.
+  export PATH="$(cygpath -u "$LOCALAPPDATA")/mise/shims:$PATH"
+  _mise_gitbash_hook() {
+    local out
+    out="$(mise hook-env -s bash 2>/dev/null | grep -v '^export PATH=')" || return 0
+    [ -n "$out" ] && eval "$out"
+  }
+  # (prepends + preserves; prompt initializers like oh-my-posh OVERWRITE
+  # PROMPT_COMMAND — init those in your .bashrc BEFORE the line sourcing this)
+  PROMPT_COMMAND="_mise_gitbash_hook${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+elif command -v mise >/dev/null 2>&1; then
   eval "$(mise activate bash)"
 fi
