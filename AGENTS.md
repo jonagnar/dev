@@ -1,68 +1,73 @@
 # AGENTS.md — working in this meta-repo
 
-This is a self-contained dev-environment meta-repo. One clone = the whole context.
-
-## Layout
-- Root scripts — the tool: `install.sh` (provision), `backup.sh` (age-encrypted
-  snapshot), `restore.sh` (decrypt + extract). Standalone bash, no shared lib;
-  runs on Linux/WSL and on Windows under Git Bash (winget bootstraps mise there).
-- `src/` — your cloned repos (gitignored), flat: projects, notes, infra — anything
-  with its own `.git`. Exception: `src/demo-api/` is committed as the reference
-  example of mise+sops multi-tenant secrets wiring (`mise.<tenant>.toml` +
-  `secrets/*.env.json` ciphertext). Compose-stack repos keep secrets as
-  `*.env.sops` and leave live Docker volumes/data untracked per their own
-  `.gitignore`.
-- `.config/` — machinery: `mise/core.toml` (core tools), `sops/.sops.yaml.tmpl`
-  (seed for the age recipient), `chezmoi/` (shell-init + gitconfig templates,
-  global gitignore, gitleaks pre-commit hook template). Backups land OUTSIDE the
-  repo: `--backup-dir` > `$DEV_BACKUP_DIR` > `~/.config/dev/backup-dir` >
-  `~/backups`.
+Self-contained dev-environment meta-repo. One clone = the whole context: three
+standalone bash scripts that provision a machine (`install.sh`), snapshot every
+repo into an age-encrypted archive (`backup.sh`), and decrypt/stage it back
+(`restore.sh`). No build step, no dependencies beyond bash + git — everything
+else (sops, age, chezmoi, gitleaks) is installed by `install.sh` via mise.
 
 ## Commands
-No build, lint, or test suite — three standalone bash scripts. Verify changes with:
-- `bash -n <script>.sh` — syntax check.
-- `./install.sh --dry-run` · `./backup.sh --dry-run` · `./restore.sh --dry-run` —
-  exercise the full flow with zero side effects; this is the closest thing to a test.
-- `./<script>.sh --help` — prints the script's leading `#` comment block (see below).
+- `./install.sh --dry-run` / `./backup.sh --dry-run` / `./restore.sh --dry-run`
+  — preview every step with no side effects; the primary way to verify changes.
+- `bash -n <script>` — syntax check. There is no test suite or linter config.
+- `./<script> --help` — prints the script's leading `#` comment block (via
+  grep), so the header comment IS the help text; update it when changing flags.
+- A real (non-dry-run) `install.sh` mutates `$HOME` (dotfiles, age key, mise
+  tools) — don't run it just to test a change.
 
-## Script architecture (read before editing the scripts)
-- **Deliberately standalone, deliberately duplicated.** There is no shared lib:
-  helpers (`info/warn/err/phase`, `run_native`, `step`, `parse_common_flags`,
-  `dev_root`, `ensure_age`, `backup_dest`) are copy-pasted across the three
-  scripts so each survives alone (e.g. restore.sh on a bare machine). If you
-  change a helper, make the same change in every script that carries it — and
-  don't "fix" the duplication by extracting a lib.
-- **The header comment IS the help.** `--help` greps the leading `# ` block of
-  the script, so those comments are user-facing documentation — keep usage
-  lines there accurate.
-- **Dry-run is structural.** Every side-effecting action goes through
+## Script architecture
+- The three scripts are deliberately standalone — no shared lib. Helpers
+  (`info/warn/err/phase`, `run_native`, `step`, `parse_common_flags`,
+  `dev_root`, `backup_dest`, `ensure_age`) are duplicated per script; a change
+  to one copy must be mirrored in the others. Don't "fix" the duplication by
+  extracting a lib — each script must survive alone (e.g. restore.sh on a bare
+  machine).
+- Dry-run is structural: every side-effecting action goes through
   `step "name" cmd args...` (prints `[dry-run] would: name` and skips) and
   prompts go through `confirm` (dry-run prints the would-prompt). New actions
   must use these wrappers, never a raw command.
-- `set -euo pipefail` + `main "$@"` run only under the `BASH_SOURCE` guard, so
-  scripts can be sourced to test individual functions.
-- **Windows/Git Bash path rules** (the subtlest part): MSYS converts *command
-  arguments* to C:/-style for native .exe tools but NOT *environment variables* —
-  anything exported for mise.exe/chezmoi.exe (e.g. `MISE_GLOBAL_CONFIG_FILE`,
-  `DEV_ROOT`) must go through `cygpath -m` (the `to_native` helper); PATH
-  entries, conversely, must stay MSYS-style (`cygpath -u`). mise itself lives in
-  the WinGet Links dir; its tool shims in `$LOCALAPPDATA/mise/shims` — both must
-  be added to PATH in non-interactive shells (`ensure_age`).
-- The backup-destination resolution chain is implemented twice (backup.sh and
-  restore.sh `backup_dest`) — keep them identical.
+- Each script ends with a `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` guard:
+  `set -euo pipefail` applies only when executed, so a script can be sourced to
+  test individual functions.
+- Cross-platform Linux/WSL + native Windows Git Bash; `command -v cygpath` is
+  the Windows detector. On Git Bash: env vars consumed by native `.exe` tools
+  (mise, chezmoi) need `C:/`-style paths (`cygpath -m`, see `to_native`), while
+  PATH entries need MSYS-style (`cygpath -u`); mise is bootstrapped via winget
+  (mise.run refuses MINGW), and its exe lands in the WinGet Links dir, which is
+  only on PATH in new shells. Tool shims live in `$LOCALAPPDATA/mise/shims`
+  (Linux: `~/.local/share/mise/shims`) — `ensure_age` wires both onto PATH for
+  non-interactive shells.
+- `.gitattributes` pins LF for everything — CRLF silently breaks the scripts
+  under bash.
 
-## Rules
-- Secrets live in `*.env.sops` or sops-encrypted `secrets/*.env.json`
-  (ciphertext) per project; never commit plaintext.
-- `.config/sops/.sops.yaml` is rendered ONCE from the `.tmpl` by install and is
-  gitignored — never re-render or overwrite it; recipients added since would be
-  silently dropped.
-- Dotfile integration is append-one-line-if-missing only (`.bashrc`,
-  `.bash_profile`, `.gitconfig`) — never rewrite a user's file.
-- Everything is LF: `.gitattributes` pins `eol=lf` because CRLF in a `.sh` or a
-  bash-consumed template breaks with `$'\r': command not found`. Don't introduce
-  CRLF, and keep new binary extensions listed there.
-- Add a global tool with `mise use -g <tool>` — keep `.config/mise/core.toml`
-  minimal (only what the scripts themselves need: sops, age, chezmoi, gitleaks).
-- Every script supports `--help` and `--dry-run`; `restore` prompts unless
-  `--yes`; `backup` never prompts.
+## Layout
+- `src/` — your cloned repos, flat, gitignored — EXCEPT `src/demo-api`, which
+  is committed on purpose (`.gitignore` whitelists it) as the reference example
+  of the secrets pattern: `.sops.yaml` (recipients) + `mise.toml` /
+  `mise.<tenant>.toml` (env wiring, selected via `MISE_ENV=<tenant>`) +
+  `secrets/*.env.json` (sops ciphertext, safe to commit).
+- `.config/mise/core.toml` — core toolchain only; add personal tools with
+  `mise use -g <tool>`, don't grow this file.
+- `.config/sops/.sops.yaml` is rendered ONCE from `.sops.yaml.tmpl` by install
+  and is gitignored; never re-render it — recipients added since would be
+  silently dropped. `backup.sh` parses its `age:` line for encryption
+  recipients (never reads the private key).
+- `.config/chezmoi/` — host-config templates applied to `$HOME`
+  (`~/.config/dev/shell-init.sh`, `~/.config/dev/gitconfig`, global gitignore,
+  gitleaks pre-commit template hook).
+- Backups land OUTSIDE the repo: `--backup-dir` > `$DEV_BACKUP_DIR` >
+  `~/.config/dev/backup-dir` > `~/backups`.
+
+## Invariants — don't break these
+- Secrets in git are ciphertext only (`secrets/*.env.{json,yaml,toml}` for
+  mise-native, `*.env.sops` for compose stacks); plaintext `.env` is blocked by
+  gitignore at every layer. Never commit plaintext.
+- `backup.sh`: the plaintext tar exists only in `$TMPDIR` and is shredded on
+  success AND failure — the destination (often a sync-watched folder) must only
+  ever see ciphertext. It refuses to encrypt with zero recipients, and never
+  prompts.
+- `install.sh` is idempotent and edits user dotfiles append-only, one line each
+  (`.bashrc` hook, `.bash_profile` → `.bashrc` chain, gitconfig include) — it
+  never rewrites an existing user file.
+- Every script supports `--help` and `--dry-run`; `restore.sh` prompts unless
+  `--yes`.
