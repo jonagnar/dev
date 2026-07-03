@@ -19,7 +19,13 @@ else (sops, age, chezmoi, gitleaks) is installed by `install.sh` via mise.
 - The three scripts are deliberately standalone — no shared lib. Helpers
   (`info/warn/err/phase`, `run_native`, `step`, `parse_common_flags`,
   `dev_root`, `backup_dest`, `ensure_age`) are duplicated per script; a change
-  to one copy must be mirrored in the others.
+  to one copy must be mirrored in the others. Don't "fix" the duplication by
+  extracting a lib — each script must survive alone (e.g. restore.sh on a bare
+  machine).
+- Dry-run is structural: every side-effecting action goes through
+  `step "name" cmd args...` (prints `[dry-run] would: name` and skips) and
+  prompts go through `confirm` (dry-run prints the would-prompt). New actions
+  must use these wrappers, never a raw command.
 - Each script ends with a `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` guard:
   `set -euo pipefail` applies only when executed, so a script can be sourced to
   test individual functions.
@@ -28,7 +34,9 @@ else (sops, age, chezmoi, gitleaks) is installed by `install.sh` via mise.
   (mise, chezmoi) need `C:/`-style paths (`cygpath -m`, see `to_native`), while
   PATH entries need MSYS-style (`cygpath -u`); mise is bootstrapped via winget
   (mise.run refuses MINGW), and its exe lands in the WinGet Links dir, which is
-  only on PATH in new shells.
+  only on PATH in new shells. Tool shims live in `$LOCALAPPDATA/mise/shims`
+  (Linux: `~/.local/share/mise/shims`) — `ensure_age` wires both onto PATH for
+  non-interactive shells.
 - `.gitattributes` pins LF for everything — CRLF silently breaks the scripts
   under bash.
 
